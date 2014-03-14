@@ -47,7 +47,7 @@ pub fn parseFile(path: &Path) -> ~[Pentomino] {
           }
           c => {
             if (c != ' ') {
-              points.push((x, y, c));
+              points.push((x, y, c.to_ascii()));
             }
 
             x = x + 1;
@@ -72,20 +72,4 @@ pub fn parseFile(path: &Path) -> ~[Pentomino] {
   }
 
   pentominoes
-}
-
-/// Finds the Board in a vector of pentominoes, and removes it
-/// and returns it.
-pub fn discoverBoard(pentominoes: &mut ~[Pentomino]) -> Pentomino {
-  let mut index = 0;
-  let mut max = 0;
-  
-  for (i, pentomino) in pentominoes.iter().enumerate() {
-    if (pentomino.area() > max) { 
-      max = pentomino.area();
-      index = i; 
-    }
-  }
-
-  pentominoes.remove(index)
 }
