@@ -1,5 +1,6 @@
 use std::{vec, str};
 use std::num::abs;
+use std::to_bytes::Cb;
 
 
 pub type Point = (uint, uint, Ascii);
@@ -8,7 +9,7 @@ pub type System = ~[Point];
 
 /// Possible representations of a Square (a 
 /// part of an entire piece) in a Pentomino
-#[deriving(Clone)]
+#[deriving(Clone, IterBytes, Eq)]
 pub enum Square {
   Unmarked(Ascii),
   Marked(Ascii),
@@ -38,10 +39,8 @@ impl Square {
   fn isMarked(&self) -> bool {
     !self.isUnmarked()
   }
-}
-
-impl Eq for Square {
-  fn eq(&self, other: &Square) -> bool {
+  /// Checks if two Squares are unmarked and equal
+  fn unmarkedEq(&self, other: &Square) -> bool {
     match *self {
       Unmarked(c) => match *other { Unmarked(c1) => c == c1, _ => false },
       _ => false
@@ -308,6 +307,38 @@ impl<'a> Pentomino<'a> {
     } else {
       false
     }
+  }
+}
+
+
+impl<'a> IterBytes for Pentomino<'a> {
+  fn iter_bytes(&self, lsb0: bool, f: Cb) -> bool {
+    self.squares.iter_bytes(lsb0, f)
+  }
+}
+
+
+impl<'a> Eq for Pentomino<'a> {
+  /// Equality is determined by equality of Unmarked 
+  /// squares
+  fn eq(&self, other: &Pentomino) -> bool {
+    if (self.size() != other.size() ||
+        self.dimX != other.dimX ||
+        self.dimY != other.dimY) { 
+      return false 
+    }
+
+    let mut equalEl = 0;
+
+    for i in range(0, self.area()) {
+      if (other.squares()[i] == self.squares()[i]) {
+        equalEl += 1
+      } else {
+        return false
+      }
+    }
+
+    self.area() == equalEl
   }
 }
 

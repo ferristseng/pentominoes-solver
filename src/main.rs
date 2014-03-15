@@ -1,6 +1,7 @@
 #[allow(dead_code)];
 
 use std::vec;
+use std::hashmap::HashSet;
 use parse::parseFile;
 use solve::bruteForce;
 use pentomino::Pentomino;
@@ -31,14 +32,15 @@ pub fn discoverBoard(pentominoes: &mut ~[Pentomino]) -> Pentomino {
 #[inline]
 fn generatePermutations(pentominoes: &mut ~[Pentomino], 
                         doRotations: bool,
-                        doReflections: bool) -> ~[~[Pentomino]] {
-  let mut permutations= vec::with_capacity(pentominoes.len());;
+                        doReflections: bool) -> ~[HashSet<Pentomino>] {
+  let mut permutations = vec::with_capacity(pentominoes.len());
 
   // Compute all permutations of each pentomino
   loop {
     match pentominoes.pop_opt() {
       Some(p) => {
         let mut reprs = vec::with_capacity(8);
+        let mut uniqs = HashSet::with_capacity(8);
 
         if (doReflections) {
           reprs.push(p.reflectX());
@@ -58,7 +60,9 @@ fn generatePermutations(pentominoes: &mut ~[Pentomino],
           }
         }
 
-        permutations.push(reprs);
+        uniqs.extend(&mut reprs.move_iter());
+
+        permutations.push(uniqs);
       }
       None => break
     }
@@ -73,7 +77,17 @@ fn main() {
   //let path = Path::new("test/pentominoes3x20.txt");
   let mut pentominoes = parseFile(&path);
   let mut board = discoverBoard(&mut pentominoes);
-  let mut permutations = generatePermutations(&mut pentominoes, true, false);
+  let mut permutations = generatePermutations(&mut pentominoes, true, true);
+
+  for reprs in permutations.iter() {
+    println(format!("Representations - {:u}", reprs.len()));
+    /*
+    for pentomino in reprs.iter() {
+      println("");
+      println(pentomino.to_str());
+      println("--");
+    }*/
+  }
 
   println(bruteForce(&mut board, &mut permutations, 0).to_str());
 }

@@ -1,9 +1,10 @@
+use std::hashmap::HashSet;
 use pentomino::Pentomino;
 
 /// Brute force method for board placement
 /// 
 /// Returns number of solutions
-pub fn bruteForce(board: &mut Pentomino, permutations: &mut ~[~[Pentomino]], 
+pub fn bruteForce(board: &mut Pentomino, permutations: &mut ~[HashSet<Pentomino>], 
                   depth: uint) -> uint {
   if (permutations.len() == 0) { println("Solved!"); return 1 }
 
