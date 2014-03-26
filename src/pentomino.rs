@@ -1,4 +1,4 @@
-use std::{vec, str};
+use std::{vec, str, iter};
 use std::num::abs;
 use std::to_bytes::Cb;
 
@@ -11,48 +11,14 @@ pub type System = ~[Point];
 /// part of an entire piece) in a Pentomino
 #[deriving(Clone, IterBytes, Eq)]
 pub enum Square {
-  Unmarked(Ascii),
-  Marked(Ascii),
+  Filled(Ascii),
   Empty
-}
-
-impl Square {
-  /// Unmarked -> Marked
-  fn mark(&mut self) {
-    match *self {
-      Unmarked(c) => *self = Marked(c),
-      _ => ()
-    }
-  }
-  /// Marked -> Unmarked
-  fn unmark(&mut self) {
-    match *self {
-      Marked(c) => *self = Unmarked(c),
-      _ => ()
-    }
-  }
-  /// Checks if unmarked
-  fn isUnmarked(&self) -> bool {
-    match *self { Unmarked(_) => true, _ => false }
-  }
-  /// Checks if marked
-  fn isMarked(&self) -> bool {
-    !self.isUnmarked()
-  }
-  /// Checks if two Squares are unmarked and equal
-  fn unmarkedEq(&self, other: &Square) -> bool {
-    match *self {
-      Unmarked(c) => match *other { Unmarked(c1) => c == c1, _ => false },
-      _ => false
-    }
-  }
 }
 
 impl AsciiCast<Ascii> for Square {
   unsafe fn to_ascii_nocheck(&self) -> Ascii {
     match *self {
-      Unmarked(c) => c,
-      Marked(_) | 
+      Filled(c) => c,
       Empty => ' '.to_ascii()
     }
   }
@@ -127,7 +93,7 @@ impl<'a> Pentomino<'a> {
 
     for point in system.iter() {
       let (coorX, coorY, c) = *point;
-      squares[coorY * dimX + coorX] = Unmarked(c);
+      squares[coorY * dimX + coorX] = Filled(c);
     }
 
     Pentomino {
@@ -154,14 +120,6 @@ impl<'a> Pentomino<'a> {
   pub fn squares(&'a self) -> &'a ~[Square] {
     &self.squares
   }
-  /// Iterator over squares in Pentomino
-  pub fn iter(&'a self) -> vec::VecIterator<'a, Square> {
-    self.squares().iter()
-  }
-  /// Mutable Iterator over squares in Pentomino
-  pub fn mut_iter(&'a mut self) -> vec::VecMutIterator<'a, Square> {
-    self.squares.mut_iter()
-  }
   /// Get a square at coordinate (x, y) in the Pentomino
   pub fn get_opt(&'a self, x: uint, y: uint) -> Option<&'a Square> {
     if (x < self.dimX && y < self.dimX) {
@@ -178,18 +136,62 @@ impl<'a> Pentomino<'a> {
 
 
 impl<'a> Pentomino<'a> {
-  /// Gets the coordinates of the first 
-  /// open (Unmarked) square
-  pub fn getFirst(&self) -> Option<(uint, uint)> {
-    for i in range(0, self.area()) { 
-      match self.squares[i] {
-        Unmarked(_) => return Some(self.getCoordinates(i)),
-        _ => () 
+  /// Iterator over squares in Pentomino
+  pub fn iter(&'a self) -> vec::VecIterator<'a, Square> { 
+    self.squares().iter()
+  }
+  /// All non-empty squares in Pentomino
+  pub fn filled(&'a self) -> iter::Filter<'a, &'a Square, 
+      vec::VecIterator<'a, Square>> {
+    self.iter().filter(|&s| match s { &Empty => false, _ => true })
+  }
+  /// Range to the area
+  pub fn range(&'a self) -> iter::Range<uint> {
+    range(0, self.area())
+  }
+  /// Returns an iterator of non-empty coordinates
+  pub fn coordinates(&'a self) -> vec::MoveIterator<Point> { 
+    let mut coords = vec::with_capacity(self.area());
+
+    for i in self.range() {
+      let (x, y) = self.getCoordinates(i);
+
+      match self.get_opt(x, y) {
+        Some(&Filled(sq)) => coords.push((x, y, sq)),
+        _ => ()
       }
     }
-    
-    None
+
+    coords.move_iter()
   }
+  /// Returns an iterator across all rotated varients of
+  /// the Pentomino
+  pub fn rotations(&self) -> vec::MoveIterator<Pentomino> {
+    let mut rotations = vec::with_capacity(4);
+
+    rotations.push(self.rotateRight());
+
+    for _ in range(0, 4) {
+      let new = rotations.last().rotateRight();
+      rotations.push(new);
+    }
+
+    rotations.move_iter()
+  }
+  /// Returns an iterator across all reflected varients of the
+  /// Pentomino
+  pub fn reflections(&self) -> vec::MoveIterator<Pentomino> {
+    let mut reflections = vec::with_capacity(2);
+
+    reflections.push(self.clone());
+    reflections.push(self.reflectX());
+
+    reflections.move_iter()
+  }
+}
+
+
+impl<'a> Pentomino<'a> {
   /// Gets coordinates that are represented 
   /// by an index
   pub fn getCoordinates(&self, i: uint) -> (uint, uint) {
@@ -203,7 +205,7 @@ impl<'a> Pentomino<'a> {
 }
 
 
-impl <'a> Pentomino<'a> {
+impl<'a> Pentomino<'a> {
   /// Generalized transform 
   /// O(n), n = number of squares 
   fn doTransformation(&self, dimX: uint, dimY: uint,
@@ -250,63 +252,20 @@ impl <'a> Pentomino<'a> {
 
 
 impl<'a> Pentomino<'a> {
-  /// Generalized Placement
-  /// O(n)
-  fn generalizedPlacement(&mut self, piece: &Pentomino,
-                          offsetX: int, offsetY: int, 
-                          fun: |square: &mut Square|) {
-    for i in range(0, piece.area()) {
-      let (coorX, coorY) = piece.getCoordinates(i);
-      let (shiftedX, shiftedY) = ((coorX as int + offsetX) as uint,
-        (coorY as int + offsetY) as uint);
+  /// Returns whether or not a piece can be placed on 
+  /// the piece
+  pub fn canPlace(&self, p: &Pentomino, offsetX: uint, 
+                  offsetY: uint) -> bool {
+    let mut placements = 0;
 
-      if (shiftedX < self.dimX && shiftedY < self.dimY && 
-          piece.get(coorX, coorY).isUnmarked()) {
-        fun(&mut self.squares[self.getIndex(shiftedX, shiftedY)]);
-      }
-    }
-  }
-  /// Makes a placement, marking all pieces in the Pentomino
-  /// that match with the inputted piece
-  pub fn doPlacement(&mut self, piece: &Pentomino,
-                 offsetX: int, offsetY: int) {
-    self.generalizedPlacement(piece, offsetX, offsetY, 
-      |square| { square.mark() });
-    self.size = self.size - piece.size()
-  }
-  /// Removes a placement, unmarked all pieces in the Pentomino
-  /// that match with the inputted piece
-  pub fn removePlacement(&mut self, piece: &Pentomino,
-                     offsetX: int, offsetY: int) {
-    self.generalizedPlacement(piece, offsetX, offsetY,
-      |square| { square.unmark() });
-    self.size = self.size + piece.size()
-  }
-  /// Attempts to overlay a Pentomino
-  /// on the current Pentomino at a specified 
-  /// offset
-  pub fn tryPlacement(&mut self, piece: &Pentomino,
-                      offsetX: int, offsetY: int) -> bool {
-    let mut count = 0;
-
-    for i in range(0, piece.area()) {
-      let (coorX, coorY) = piece.getCoordinates(i);
-
-      match self.get_opt((coorX as int + offsetX) as uint, 
-                         (coorY as int + offsetY) as uint) {
-        Some(square) => if (square == piece.get(coorX, coorY)) {
-          count = count + 1
-        },
-        None => () 
+    for (x, y, c) in p.coordinates() {
+      match self.get_opt(x + offsetX, y + offsetY) {
+        Some(sq) => if (sq.to_ascii() == c) { placements += 1; },
+        None => ()
       }
     }
 
-    if (count == piece.size()) {
-      self.doPlacement(piece, offsetX, offsetY);
-      true
-    } else {
-      false
-    }
+    placements == p.size()
   }
 }
 
@@ -319,8 +278,6 @@ impl<'a> IterBytes for Pentomino<'a> {
 
 
 impl<'a> Eq for Pentomino<'a> {
-  /// Equality is determined by equality of Unmarked 
-  /// squares
   fn eq(&self, other: &Pentomino) -> bool {
     if (self.size() != other.size() ||
         self.dimX != other.dimX ||
@@ -330,7 +287,7 @@ impl<'a> Eq for Pentomino<'a> {
 
     let mut equalEl = 0;
 
-    for i in range(0, self.area()) {
+    for i in self.range() { 
       if (other.squares()[i] == self.squares()[i]) {
         equalEl += 1
       } else {

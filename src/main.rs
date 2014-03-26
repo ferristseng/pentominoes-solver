@@ -3,7 +3,6 @@
 use std::vec;
 use std::hashmap::HashSet;
 use parse::parseFile;
-use solve::bruteForce;
 use pentomino::Pentomino;
 
 mod solve;
@@ -27,67 +26,61 @@ pub fn discoverBoard(pentominoes: &mut ~[Pentomino]) -> Pentomino {
   pentominoes.remove(index)
 }
 
-/// Generates permutations of all Pentominoes, 
-/// destroying the initial vector
-#[inline]
-fn generatePermutations(pentominoes: &mut ~[Pentomino], 
-                        doRotations: bool,
-                        doReflections: bool) -> ~[HashSet<Pentomino>] {
-  let mut permutations = vec::with_capacity(pentominoes.len());
+pub fn generateSolutionMatrix(board: &Pentomino, 
+                              pentominoes: &~[Pentomino]) -> ~[~[int]] {
+  let mut matrixSet: HashSet<~[int]> = HashSet::new();
+  let offset = pentominoes.len();
+  let cols = offset + board.area();
 
-  // Compute all permutations of each pentomino
-  loop {
-    match pentominoes.pop_opt() {
-      Some(p) => {
-        let mut reprs = vec::with_capacity(8);
-        let mut uniqs = HashSet::with_capacity(8);
+  for (i, piece) in pentominoes.iter().enumerate() {
+    for (x, y, _) in board.coordinates() {
+      for rotation in piece.rotations() {
+        for permutation in rotation.reflections() {
+          if (board.canPlace(&permutation, x, y)) {
+            let mut row = vec::from_elem(cols, 0);
 
-        if (doReflections) {
-          reprs.push(p.reflectX());
-        }
+            row[i] = 1;
 
-        reprs.push(p);
-
-        if (doRotations) {
-          for i in range(0, reprs.len()) {
-            let mut tmp = i;
-
-            for _ in range(0, 3) {
-              let r = reprs[tmp].rotateRight();
-              reprs.push(r);
-              tmp = reprs.len() - 1;
+            for (x0, y0, _) in permutation.coordinates() {
+              row[board.getIndex(x0 + x, y0 + y) + offset] = 1;
             }
+
+            matrixSet.insert(row);
           }
         }
-
-        uniqs.extend(&mut reprs.move_iter());
-
-        permutations.push(uniqs);
       }
-      None => break
     }
   }
 
-  permutations 
+  matrixSet.move_iter().to_owned_vec()
+}
+
+pub fn solveSolutionMatrix(board: &Pentomino,
+                           pentominoes: &~[Pentomino],
+                           matrix: ~[~[int]],
+                           markedRows: &mut ~[bool],
+                           markedCols: &mut ~[bool]) {
+  let offset = pentominoes.len();
+
+  for i in board.range() {
+
+  }
 }
 
 fn main() {
-  let path = Path::new("test/pentominoes6x10.txt");
+  //let path = Path::new("test/pentominoes6x10.txt");
   //let path = Path::new("test/trivial.txt");
   //let path = Path::new("test/pentominoes3x20.txt");
+  let path = Path::new("test/pentominoes8x8_middle_missing.txt");
   let mut pentominoes = parseFile(&path);
-  let mut board = discoverBoard(&mut pentominoes);
-  let mut permutations = generatePermutations(&mut pentominoes, true, true);
+  let board = discoverBoard(&mut pentominoes);
+  let matrixVec = generateSolutionMatrix(&board, &pentominoes);
+  let mut markedRows = vec::from_elem(matrixVec.len(), false);
+  let mut markedCols = vec::from_elem(matrixVec[0].len(), false);
+    
+  println("Rows in matrixVec: " + matrixVec.len().to_str());
+  println("Cols in matrixVec: " + matrixVec[0].len().to_str());
+  println("Expected empty squares in solution: " + 
+          (board.area() - board.size()).to_str());
 
-  for reprs in permutations.iter() {
-    println(format!("Representations - {:u}", reprs.len()));
-    /*
-    for pentomino in reprs.iter() {
-      println("");
-      println(pentomino.to_str());
-      println("--");
-    }*/
-  }
-
-  println(bruteForce(&mut board, &mut permutations, 0).to_str());
 }
