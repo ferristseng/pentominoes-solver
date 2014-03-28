@@ -1,7 +1,10 @@
 #[allow(dead_code)];
 
+extern mod extra;
+
 use std::vec;
 use std::hashmap::HashSet;
+use extra::bitv::Bitv;
 use parse::parseFile;
 use pentomino::Pentomino;
 
@@ -27,117 +30,42 @@ pub fn discoverBoard(pentominoes: &mut ~[Pentomino]) -> Pentomino {
 }
 
 pub fn generateSolutionMatrix(board: &Pentomino, 
-                              pentominoes: &~[Pentomino]) -> ~[~[int]] {
-  let mut matrixSet: HashSet<~[int]> = HashSet::new();
+                              pentominoes: &~[Pentomino]) -> ~[Bitv] {
+  // HashSet is used to keep track of uniques
+  let mut matrixSet: HashSet<~[u8]> = HashSet::new();
+  let mut matrixVec: ~[Bitv] = ~[];
   let offset = pentominoes.len();
   let cols = offset + board.area();
 
   for (i, piece) in pentominoes.iter().enumerate() {
+    let mut count: uint = 0;
+
     for (x, y, _) in board.coordinates() {
       for rotation in piece.rotations() {
         for permutation in rotation.reflections() {
           if (board.canPlace(&permutation, x, y)) {
-            let mut row = vec::from_elem(cols, 0);
+            let mut row = Bitv::new(cols, false); 
 
-            row[i] = 1;
+            row.set(i, true);
 
-            for (x0, y0, _) in permutation.coordinates() {
-              row[board.getIndex(x0 + x, y0 + y) + offset] = 1;
+            for (x0, y0, _) in permutation.filled() {
+              row.set(board.getIndex(x0 + x, y0 + y) + offset, true);
             }
 
-            matrixSet.insert(row);
+            if (matrixSet.insert(row.to_bytes())) { 
+              matrixVec.push(row);
+              count += 1;
+            }
           }
         }
       }
     }
+
+    println(piece.to_str());
+    println(format!("{:u} placements", count));
   }
 
-  matrixSet.move_iter().to_owned_vec()
-}
-
-/// This is a backtracking algorithm 
-/// by Donald Knuth solving a generalized version 
-/// of the Pentominoes puzzle, the exact cover problem.
-pub fn solveSolutionMatrix(board: &Pentomino,
-                           matrix: &~[~[int]],
-                           markedRows: &mut ~[bool],
-                           markedCols: &mut ~[bool], 
-                           offset: uint,
-                           target: uint,
-                           solutionVec: &mut ~[uint],
-                           numSolu: &mut uint) {
-  // Check if we have a solution!
-  let mut empty = 0;
-  let mut filled = 0;
-
-  for b in markedCols.iter() { 
-    if (!b) { empty += 1 } else { filled += 1 } }
-  
-  if (empty == target) {
-    *numSolu += 1;
-    // Debug
-    println("--New Solution--");
-    for i in range(0, solutionVec.len()) {
-      println(format!("{:?}", matrix[solutionVec[i]]));
-    }
-    return;
-  } else if (filled == markedCols.len() - target) {
-    return;
-  }
-
-  // Choose a column in the matrix that is unmarked 
-  for i in board.range() {
-    let i = i + offset; 
-
-    if (markedCols[i]) { continue }
-
-    markedCols[i] = true;
-
-    // For each row in the column that contains a 1 
-    for (j, row) in matrix.iter().enumerate() {
-      if (row[i] == 1 && !markedRows[j]) {
-        let mut newCols = ~[];
-        let mut newRows = ~[];
-
-        for (k, val) in row.iter().enumerate() {
-
-          // Erase all cols where the row contains a 1
-          if (*val == 1) { 
-            if (!markedCols[k]) {
-              newCols.push(k);
-              markedCols[k] = true; 
-            }
-            // Erase all rows where the col contains a 1
-            for (l, row0) in matrix.iter().enumerate() {
-              if (row0[k] == 1 && !markedRows[l]) { 
-                markedRows[l] = true;
-                newRows.push(l);
-              }
-            }
-          }
-        }
-
-        // Solve the subproblem
-        solutionVec.push(j);
-        
-        solveSolutionMatrix(board, matrix, markedRows, markedCols, 
-                            offset, target, solutionVec, numSolu);
-        
-        // Restore to explore a different solution
-        solutionVec.pop();
-
-        for c in newCols.move_iter() {
-          markedCols[c] = false;
-        }
-
-        for r in newRows.move_iter() {
-          markedRows[r] = false;
-        }
-      }
-    }
-
-    markedCols[i] = false;
-  }
+  matrixVec
 }
 
 fn main() {
@@ -147,20 +75,26 @@ fn main() {
   let path = Path::new("test/pentominoes8x8_middle_missing.txt");
   let mut pentominoes = parseFile(&path);
   let board = discoverBoard(&mut pentominoes);
+
+  // Begin Solving
   let matrixVec = generateSolutionMatrix(&board, &pentominoes);
-  let mut markedRows = vec::from_elem(matrixVec.len(), false);
-  let mut markedCols = vec::from_elem(matrixVec[0].len(), false);
-  let mut solutionVec = vec::with_capacity(pentominoes.len());
-  let mut solutions = 0;
-    
+  let cols = pentominoes.len() + board.area();
+  let mut markedRows = Bitv::new(matrixVec.len(), false);
+  let mut markedCols = Bitv::new(cols, false);
+  let mut solutionVec: ~[uint] = vec::with_capacity(pentominoes.len());
+  let mut solutions: uint = 0;
+
+  println(format!("{:u}x{:u} Board", board.dimX, board.dimY));
   println("Rows in matrixVec: " + matrixVec.len().to_str());
-  println("Cols in matrixVec: " + matrixVec[0].len().to_str());
+  println("Cols in matrixVec: " + cols.to_str());
   println("Expected empty squares in solution: " + 
           (board.area() - board.size()).to_str());
   
+  /*
   solveSolutionMatrix(&board, &matrixVec, &mut markedRows, &mut markedCols, 
                       pentominoes.len(), board.area() - board.size(), 
-                      &mut solutionVec, &mut solutions);
+                      &mut solutionVec, &mut solutions, 0);
+  */
 
   println("Solutions: " + solutions.to_str());
 }

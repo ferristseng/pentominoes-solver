@@ -122,7 +122,7 @@ impl<'a> Pentomino<'a> {
   }
   /// Get a square at coordinate (x, y) in the Pentomino
   pub fn get_opt(&'a self, x: uint, y: uint) -> Option<&'a Square> {
-    if (x < self.dimX && y < self.dimX) {
+    if (x < self.dimX && y < self.dimY) {
       self.squares().get_opt(self.getIndex(x, y))
     } else {
       None
@@ -140,25 +140,31 @@ impl<'a> Pentomino<'a> {
   pub fn iter(&'a self) -> vec::VecIterator<'a, Square> { 
     self.squares().iter()
   }
-  /// All non-empty squares in Pentomino
-  pub fn filled(&'a self) -> iter::Filter<'a, &'a Square, 
-      vec::VecIterator<'a, Square>> {
-    self.iter().filter(|&s| match s { &Empty => false, _ => true })
-  }
   /// Range to the area
   pub fn range(&'a self) -> iter::Range<uint> {
     range(0, self.area())
   }
-  /// Returns an iterator of non-empty coordinates
-  pub fn coordinates(&'a self) -> vec::MoveIterator<Point> { 
-    let mut coords = vec::with_capacity(self.area());
+  /// Returns an iterator over all coordinates
+  pub fn coordinates(&self) -> vec::MoveIterator<Point> {
+    vec::from_fn(self.area(), |i| { 
+      let (x, y) = self.getCoordinates(i);
+
+      match self.get_opt(x, y) {
+        Some(&Filled(sq)) => (x, y, sq), 
+        _ => (x, y, ' '.to_ascii())
+      }
+    }).move_iter()
+  }
+  /// Returns an iterator over all non-empty coordinates
+  pub fn filled(&self) -> vec::MoveIterator<Point> { 
+    let mut coords = vec::with_capacity(self.size());
 
     for i in self.range() {
       let (x, y) = self.getCoordinates(i);
 
       match self.get_opt(x, y) {
         Some(&Filled(sq)) => coords.push((x, y, sq)),
-        _ => ()
+        _ => () 
       }
     }
 
@@ -212,7 +218,7 @@ impl<'a> Pentomino<'a> {
                       fun: |x: uint, y: uint| -> uint) -> Pentomino {
     let mut squares = vec::from_elem(self.dimX * self.dimY, Empty);
 
-    for i in range(0, self.area()) {
+    for i in self.range() {
       let (coorX, coorY) = self.getCoordinates(i);
       squares[fun(coorX, coorY)] = self.squares[i];
     }
@@ -256,11 +262,11 @@ impl<'a> Pentomino<'a> {
   /// the piece
   pub fn canPlace(&self, p: &Pentomino, offsetX: uint, 
                   offsetY: uint) -> bool {
-    let mut placements = 0;
+    let mut placements: uint = 0;
 
-    for (x, y, c) in p.coordinates() {
+    for (x, y, c) in p.filled() {
       match self.get_opt(x + offsetX, y + offsetY) {
-        Some(sq) => if (sq.to_ascii() == c) { placements += 1; },
+        Some(sq) => if (sq.to_ascii() == c) { placements += 1 },
         None => ()
       }
     }
