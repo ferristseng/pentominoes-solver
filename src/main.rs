@@ -55,15 +55,88 @@ pub fn generateSolutionMatrix(board: &Pentomino,
   matrixSet.move_iter().to_owned_vec()
 }
 
+/// This is a backtracking algorithm 
+/// by Donald Knuth solving a generalized version 
+/// of the Pentominoes puzzle, the exact cover problem.
 pub fn solveSolutionMatrix(board: &Pentomino,
-                           pentominoes: &~[Pentomino],
-                           matrix: ~[~[int]],
+                           matrix: &~[~[int]],
                            markedRows: &mut ~[bool],
-                           markedCols: &mut ~[bool]) {
-  let offset = pentominoes.len();
+                           markedCols: &mut ~[bool], 
+                           offset: uint,
+                           target: uint,
+                           solutionVec: &mut ~[uint],
+                           numSolu: &mut uint) {
+  // Check if we have a solution!
+  let mut empty = 0;
+  let mut filled = 0;
 
+  for b in markedCols.iter() { 
+    if (!b) { empty += 1 } else { filled += 1 } }
+  
+  if (empty == target) {
+    *numSolu += 1;
+    // Debug
+    println("--New Solution--");
+    for i in range(0, solutionVec.len()) {
+      println(format!("{:?}", matrix[solutionVec[i]]));
+    }
+    return;
+  } else if (filled == markedCols.len() - target) {
+    return;
+  }
+
+  // Choose a column in the matrix that is unmarked 
   for i in board.range() {
+    let i = i + offset; 
 
+    if (markedCols[i]) { continue }
+
+    markedCols[i] = true;
+
+    // For each row in the column that contains a 1 
+    for (j, row) in matrix.iter().enumerate() {
+      if (row[i] == 1 && !markedRows[j]) {
+        let mut newCols = ~[];
+        let mut newRows = ~[];
+
+        for (k, val) in row.iter().enumerate() {
+
+          // Erase all cols where the row contains a 1
+          if (*val == 1) { 
+            if (!markedCols[k]) {
+              newCols.push(k);
+              markedCols[k] = true; 
+            }
+            // Erase all rows where the col contains a 1
+            for (l, row0) in matrix.iter().enumerate() {
+              if (row0[k] == 1 && !markedRows[l]) { 
+                markedRows[l] = true;
+                newRows.push(l);
+              }
+            }
+          }
+        }
+
+        // Solve the subproblem
+        solutionVec.push(j);
+        
+        solveSolutionMatrix(board, matrix, markedRows, markedCols, 
+                            offset, target, solutionVec, numSolu);
+        
+        // Restore to explore a different solution
+        solutionVec.pop();
+
+        for c in newCols.move_iter() {
+          markedCols[c] = false;
+        }
+
+        for r in newRows.move_iter() {
+          markedRows[r] = false;
+        }
+      }
+    }
+
+    markedCols[i] = false;
   }
 }
 
@@ -77,10 +150,17 @@ fn main() {
   let matrixVec = generateSolutionMatrix(&board, &pentominoes);
   let mut markedRows = vec::from_elem(matrixVec.len(), false);
   let mut markedCols = vec::from_elem(matrixVec[0].len(), false);
+  let mut solutionVec = vec::with_capacity(pentominoes.len());
+  let mut solutions = 0;
     
   println("Rows in matrixVec: " + matrixVec.len().to_str());
   println("Cols in matrixVec: " + matrixVec[0].len().to_str());
   println("Expected empty squares in solution: " + 
           (board.area() - board.size()).to_str());
+  
+  solveSolutionMatrix(&board, &matrixVec, &mut markedRows, &mut markedCols, 
+                      pentominoes.len(), board.area() - board.size(), 
+                      &mut solutionVec, &mut solutions);
 
+  println("Solutions: " + solutions.to_str());
 }
