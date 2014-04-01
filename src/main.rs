@@ -1,13 +1,15 @@
 #[allow(dead_code)];
+#[allow(unused_mut)];
 
 extern mod extra;
 
 use std::vec;
-use std::hashmap::HashSet;
-use extra::bitv::Bitv;
 use parse::parseFile;
 use pentomino::Pentomino;
+use dlink::DancingMatrix;
+use solve::generateSolutionMatrix;
 
+mod dlink;
 mod solve;
 mod parse;
 mod pentomino;
@@ -29,72 +31,44 @@ pub fn discoverBoard(pentominoes: &mut ~[Pentomino]) -> Pentomino {
   pentominoes.remove(index)
 }
 
-pub fn generateSolutionMatrix(board: &Pentomino, 
-                              pentominoes: &~[Pentomino]) -> ~[Bitv] {
-  // HashSet is used to keep track of uniques
-  let mut matrixSet: HashSet<~[u8]> = HashSet::new();
-  let mut matrixVec: ~[Bitv] = ~[];
-  let offset = pentominoes.len();
-  let cols = offset + board.area();
-
-  for (i, piece) in pentominoes.iter().enumerate() {
-    let mut count: uint = 0;
-
-    for (x, y, _) in board.coordinates() {
-      for rotation in piece.rotations() {
-        for permutation in rotation.reflections() {
-          if (board.canPlace(&permutation, x, y)) {
-            let mut row = Bitv::new(cols, false); 
-
-            row.set(i, true);
-
-            for (x0, y0, _) in permutation.filled() {
-              row.set(board.getIndex(x0 + x, y0 + y) + offset, true);
-            }
-
-            if (matrixSet.insert(row.to_bytes())) { 
-              matrixVec.push(row);
-              count += 1;
-            }
-          }
-        }
-      }
-    }
-
-    println(piece.to_str());
-    println(format!("{:u} placements", count));
+pub fn solve(solutionMatrix: &mut DancingMatrix) {
+  if (solutionMatrix.root().right() == 0) {
+    println("Solution Found!");
   }
 
-  matrixVec
+  let mut minCol = 0;
+  
+  for (col, n) in solutionMatrix.iterHeader() {
+    if (minCol == 0) { minCol = col }
+    if (n.len() < solutionMatrix.get(0, minCol).len() && col != 0) { minCol = col }
+  }
+
+  //println(solutionMatrix.to_str());
+  
+  solutionMatrix.deleteCol(minCol);
+
+  //println(solutionMatrix.to_str());
+
+  //solve(solutionMatrix);
+
+  solutionMatrix.undeleteCol(minCol);
 }
 
 fn main() {
   //let path = Path::new("test/pentominoes6x10.txt");
-  //let path = Path::new("test/trivial.txt");
+  let path = Path::new("test/trivial.txt");
   //let path = Path::new("test/pentominoes3x20.txt");
-  let path = Path::new("test/pentominoes8x8_middle_missing.txt");
+  //let path = Path::new("test/pentominoes8x8_middle_missing.txt");
   let mut pentominoes = parseFile(&path);
   let board = discoverBoard(&mut pentominoes);
 
   // Begin Solving
-  let matrixVec = generateSolutionMatrix(&board, &pentominoes);
+  let mut solutionMatrix = generateSolutionMatrix(&board, &pentominoes);
   let cols = pentominoes.len() + board.area();
-  let mut markedRows = Bitv::new(matrixVec.len(), false);
-  let mut markedCols = Bitv::new(cols, false);
-  let mut solutionVec: ~[uint] = vec::with_capacity(pentominoes.len());
-  let mut solutions: uint = 0;
 
   println(format!("{:u}x{:u} Board", board.dimX, board.dimY));
-  println("Rows in matrixVec: " + matrixVec.len().to_str());
-  println("Cols in matrixVec: " + cols.to_str());
-  println("Expected empty squares in solution: " + 
-          (board.area() - board.size()).to_str());
-  
-  /*
-  solveSolutionMatrix(&board, &matrixVec, &mut markedRows, &mut markedCols, 
-                      pentominoes.len(), board.area() - board.size(), 
-                      &mut solutionVec, &mut solutions, 0);
-  */
+  println("Rows in solutionMatrix: " + solutionMatrix.len().to_str());
+  println("Cols in solutionMatrix: " + cols.to_str());
 
-  println("Solutions: " + solutions.to_str());
+  solve(&mut solutionMatrix);
 }

@@ -151,6 +151,7 @@ impl<'a> Pentomino<'a> {
 
       match self.get_opt(x, y) {
         Some(&Filled(sq)) => (x, y, sq), 
+
         _ => (x, y, ' '.to_ascii())
       }
     }).move_iter()
