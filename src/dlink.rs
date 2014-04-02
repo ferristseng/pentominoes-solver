@@ -117,6 +117,13 @@ impl DancingNode {
       _ => fail!("incr applied on invalid node!")
     }
   }
+  pub fn decr(&mut self) {
+    match *self {
+      ColumnNode(_, ref mut x) => *x -= 1,
+      Root(_) => (),
+      _ => fail!("decr applied on invalid node!")
+    }
+  }
 }
 
 
@@ -135,8 +142,8 @@ impl Container for DancingNode {
 impl ToStr for DancingNode {
   fn to_str(&self) -> ~str {
     match *self {
-      Root(_) => ~"R",
-      ColumnNode(_, _) => ~"C",
+      Root(_) => ~"R", 
+      ColumnNode(_, _) => ~"C", 
       InnerNode(_, _) => ~"1",
       EmptyNode => ~"0",
     } 
@@ -272,52 +279,80 @@ impl DancingMatrix {
 // Node deletion and undeletion
 impl DancingMatrix {
   /// Deletes a col
-  fn _deleteCol(&mut self, i: uint) {
-    let left = self.header()[i].left();
-    let right = self.header()[i].right();
+  pub fn deleteCol(&mut self, i: uint) {
+    assert!(i < self.cols());
 
-    self.inner[0][left].setRight(right);
-    self.inner[0][right].setLeft(left);
+    if (i != 0) {
+      debug!("Deleting {:u}...", i);
+
+      let left = self.header()[i].left();
+      let right = self.header()[i].right();
+
+      self.inner[0][left].setRight(right);
+      self.inner[0][right].setLeft(left);
+    }
   }
   /// Deletes a node
-  fn _deleteNode(&mut self, row: uint, col: uint) {
+  pub fn deleteNode(&mut self, row: uint, col: uint) {
+    assert!(row < self.len() + 1);
+    assert!(col < self.cols());
+
+    debug!("Deleting ({:u}, {:u})...", row, col);
+
     let up = self.inner[row][col].up();
     let down = self.inner[row][col].down();
 
     self.inner[up][col].setDown(down);
     self.inner[down][col].setUp(up);
+
+    self.inner[0][col].decr();
   }
   /// Undelete col
-  fn _undeleteCol(&mut self, i: uint) {
-    let left = self.header()[i].left();
-    let right = self.header()[i].right();
+  pub fn undeleteCol(&mut self, i: uint) {
+    assert!(i < self.cols());
 
-    self.inner[0][left].setRight(i);
-    self.inner[0][right].setLeft(i);
+    if (i != 0) {
+      debug!("Undeleting {:u}...", i);
+
+      let left = self.header()[i].left();
+      let right = self.header()[i].right();
+
+      self.inner[0][left].setRight(i);
+      self.inner[0][right].setLeft(i);
+    }
   }
   /// Undelete a node
-  fn _undeleteNode(&mut self, row: uint, col: uint) {
+  pub fn undeleteNode(&mut self, row: uint, col: uint) {
+    assert!(row < self.len() + 1);
+    assert!(col < self.cols());
+
+    debug!("Undeleting ({:u}, {:u})...", row, col);
+
     let up = self.inner[row][col].up();
     let down = self.inner[row][col].down();
 
     self.inner[up][col].setDown(row);
     self.inner[down][col].setUp(row);
-  }
-  /// Deletes a column in the inner matrix
-  /// and all rows in that column
-  pub fn deleteCol(&mut self, i: uint) {
-    if (!(i < self.len())) { fail!("out of index column!") } 
 
-    self._deleteCol(i);
+    self.inner[0][col].incr();
+  }
+  /// Covers a column in the inner 
+  /// matrix
+  pub fn coverCol(&mut self, i: uint) {
+    assert!(i < self.cols());
+
+    if (i == 0) { return }
+
+    self.deleteCol(i);
 
     let mut currentCol;
     let mut currentRow = self.inner[0][i].down();
 
     while (currentRow != 0) {
-      currentCol = self.inner[currentRow][i].right(); 
+      currentCol = self.inner[currentRow][i].right();
 
       while (currentCol != i) {
-        self._deleteNode(currentRow, currentCol);
+        self.deleteNode(currentRow, currentCol);
 
         currentCol = self.inner[currentRow][currentCol].right();
       }
@@ -325,12 +360,13 @@ impl DancingMatrix {
       currentRow = self.inner[currentRow][i].down();
     }
   }
-  /// Undeletes a column in the inner matrix
-  /// and all rows in that column
-  pub fn undeleteCol(&mut self, i: uint) {
-    if (!(i < self.len())) { fail!("out of index column!") }
+  /// Uncovers a column in the inner matrix
+  pub fn uncoverCol(&mut self, i: uint) {
+    assert!(i < self.cols());
 
-    self._undeleteCol(i);
+    if (i == 0) { return; }
+
+    self.undeleteCol(i);
 
     let mut currentCol;
     let mut currentRow = self.inner[0][i].up();
@@ -339,7 +375,7 @@ impl DancingMatrix {
       currentCol = self.inner[currentRow][i].left();
 
       while (currentCol != i) {
-        self._undeleteNode(currentRow, currentCol);
+        self.undeleteNode(currentRow, currentCol);
 
         currentCol = self.inner[currentRow][currentCol].left();
       }
@@ -353,11 +389,12 @@ impl DancingMatrix {
 // Iterators
 impl DancingMatrix {
   /// An iterator for the header row
-  pub fn iterHeader<'a>(&'a self) -> DancingMatrixGenericIterator<'a> {
-    DancingMatrixGenericIterator { 
-      inner: self.header(), start: 0, current: 0, 
-      next_fn: |d: &DancingNode| -> uint { d.right() } 
-    }
+  pub fn iterHeader<'a>(&'a self) -> DancingMatrixHeaderIterator<'a> {
+    DancingMatrixHeaderIterator { inner: self.header(), current: self.root().right() } 
+  }
+  /// An iterator across all the rows
+  pub fn iterRows<'a>(&'a self) -> DancingMatrixRowIterator<'a> {
+    DancingMatrixRowIterator { inner: self, current: self.root().down() }
   }
 }
 
@@ -371,7 +408,7 @@ impl ToStr for DancingMatrix {
       cols.push(col);
     }
 
-    for row in self.inner.slice_from(1).iter() {
+    for (_, row) in self.iterRows() {
       for col in cols.iter() {
         buf.push_str(row[*col].to_str() + ", ");
       }
@@ -390,18 +427,35 @@ impl Container for DancingMatrix {
 }
 
 
-struct DancingMatrixGenericIterator<'a> {
+struct DancingMatrixHeaderIterator<'a> {
   inner: &'a ~[DancingNode],
-  start: uint,
-  current: uint,
-  next_fn: 'a |&'a DancingNode| -> uint 
+  current: uint
 }
 
 
-impl<'a> Iterator<(uint, &'a DancingNode)> for DancingMatrixGenericIterator<'a> {
+impl<'a> Iterator<(uint, &'a DancingNode)> for DancingMatrixHeaderIterator<'a> {
+  /// Gives a tuple (Column, Node)
   fn next(&mut self) -> Option<(uint, &'a DancingNode)> {
-    if (self.current == self.start) { return None }
-    self.current = self.next_fn(self.inner[self.current]);
-    Some((self.current, &self.inner[self.current]))
+    if (self.current == 0) { return None }
+    let tmp = self.current;
+    self.current = self.inner[self.current].right();
+    Some((tmp, &self.inner[tmp]))
+  }
+}
+
+
+struct DancingMatrixRowIterator<'a> {
+  inner: &'a DancingMatrix,
+  current: uint
+}
+
+
+impl<'a> Iterator<(uint, &'a ~[DancingNode])> for DancingMatrixRowIterator<'a> {
+  /// Gives a tuple (Row_Num, Row)
+  fn next(&mut self) -> Option<(uint, &'a ~[DancingNode])> {
+    if (self.current == 0) { return None }
+    let tmp = self.current;
+    self.current = self.inner.get(self.current, 0).down();
+    Some((tmp, &self.inner.inner[tmp]))
   }
 }
