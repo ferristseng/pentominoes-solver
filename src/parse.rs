@@ -3,6 +3,7 @@ use std::num::abs;
 use std::io::File;
 use pentomino::{Pentomino, System};
 
+
 /// Discovers all adjacent points
 /// in a System from a given coordinate
 #[inline]
@@ -25,6 +26,7 @@ fn discoverPoints(startX: uint, startY: uint, system: &mut System,
     }
   }
 }
+
 
 /// Takes in a path, and parses
 /// a file at the path, finding all 

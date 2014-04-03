@@ -283,8 +283,6 @@ impl DancingMatrix {
     assert!(i < self.cols());
 
     if (i != 0) {
-      debug!("Deleting {:u}...", i);
-
       let left = self.header()[i].left();
       let right = self.header()[i].right();
 
@@ -296,8 +294,6 @@ impl DancingMatrix {
   pub fn deleteNode(&mut self, row: uint, col: uint) {
     assert!(row < self.len() + 1);
     assert!(col < self.cols());
-
-    debug!("Deleting ({:u}, {:u})...", row, col);
 
     let up = self.inner[row][col].up();
     let down = self.inner[row][col].down();
@@ -312,8 +308,6 @@ impl DancingMatrix {
     assert!(i < self.cols());
 
     if (i != 0) {
-      debug!("Undeleting {:u}...", i);
-
       let left = self.header()[i].left();
       let right = self.header()[i].right();
 
@@ -325,8 +319,6 @@ impl DancingMatrix {
   pub fn undeleteNode(&mut self, row: uint, col: uint) {
     assert!(row < self.len() + 1);
     assert!(col < self.cols());
-
-    debug!("Undeleting ({:u}, {:u})...", row, col);
 
     let up = self.inner[row][col].up();
     let down = self.inner[row][col].down();

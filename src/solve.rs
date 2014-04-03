@@ -7,7 +7,6 @@ pub fn generateSolutionMatrix(board: &Pentomino,
                               pentominoes: &~[Pentomino]) -> DancingMatrix {
   let offset = pentominoes.len();
   let cols = offset + board.area();
-
   let mut removed: uint = 0;
   let mut solutionMatrix = DancingMatrix::new(cols);
 
@@ -53,4 +52,56 @@ pub fn generateSolutionMatrix(board: &Pentomino,
 
   solutionMatrix
 }
+
+
+pub fn solve(solutionMatrix: &mut DancingMatrix, depth: uint, solutions: &mut uint) {
+  if (solutionMatrix.root().right() == 0) {
+    *solutions += 1;
+    return;
+  }
+
+  // Find the column with the minimum number of 1's 
+  let mut minCol = 0;
+  
+  for (col, n) in solutionMatrix.iterHeader() {
+    if (minCol == 0) { minCol = col }
+    if (n.len() == 0) { return }
+    if (n.len() < solutionMatrix.get(0, minCol).len() && col != 0) { minCol = col }
+  }
+
+  let mut currentCol;
+  let mut currentRow = solutionMatrix.get(0, minCol).down();
+
+  //debug!("minCol=({:u}, {:u})", minCol, solutionMatrix.get(0, minCol).len());
+
+  solutionMatrix.coverCol(minCol);
+
+  while (currentRow != 0) {
+    currentCol = solutionMatrix.get(currentRow, minCol).right(); 
+
+    // Cover all columns in the current row
+    while (currentCol != minCol) {
+      solutionMatrix.coverCol(currentCol);
+      
+      currentCol = solutionMatrix.get(currentRow, currentCol).right();
+    }
+
+    // Recursively solve
+    solve(solutionMatrix, depth + 1, solutions);
+
+    currentCol = solutionMatrix.get(currentRow, minCol).left();
+
+    // Uncover all columns in the current row (iterate in reverse)
+    while (currentCol != minCol) {
+      solutionMatrix.uncoverCol(currentCol);
+
+      currentCol = solutionMatrix.get(currentRow, currentCol).left();
+    }
+
+    currentRow = solutionMatrix.get(currentRow, minCol).down();
+  }
+
+  solutionMatrix.uncoverCol(minCol);
+}
+
 
