@@ -1,7 +1,7 @@
-use std::hashmap::HashMap;
+use collections::hashmap::HashMap;
 
 
-#[deriving(Clone, ToStr)]
+#[deriving(Clone, Show)]
 pub enum OptionType {
   StrOption(~str),
   BoolOption(bool),
@@ -19,7 +19,7 @@ pub enum OptionType {
 ///   * -s
 ///
 fn parseOption(opt: &~str) -> (~str, Option<~str>){
-  if (opt.len() < 2) { fail!("invalid option specified") }
+  if opt.len() < 2 { fail!("invalid option specified") }
 
   let mut pos = 0;
   let mut key = ~"";
@@ -28,8 +28,8 @@ fn parseOption(opt: &~str) -> (~str, Option<~str>){
   for c in opt.chars() {
     pos += 1;
 
-    if (c == '-' && pos < 3) { continue }
-    if (c == '=') { break } 
+    if c == '-' && pos < 3 { continue }
+    if c == '=' { break } 
 
     key.push_char(c);
   }
@@ -38,7 +38,7 @@ fn parseOption(opt: &~str) -> (~str, Option<~str>){
     val.push_char(c);
   }
 
-  if (val.len() > 0) {
+  if val.len() > 0 {
     (key, Some(val))
   } else {
     (key, None)
@@ -55,8 +55,8 @@ fn parseOption(opt: &~str) -> (~str, Option<~str>){
 ///            value that the option holds
 ///
 pub struct OptionParser {
-  priv defs: HashMap<~str, OptionType>,
-  priv vals: HashMap<~str, OptionType>
+  defs: HashMap<~str, OptionType>,
+  vals: HashMap<~str, OptionType>
 }
 
 
@@ -71,7 +71,7 @@ impl OptionParser {
     for arg in args.iter() {
       let (key, val) = parseOption(arg);
 
-      if (self.vals.contains_key(&key)) {
+      if self.vals.contains_key(&key) {
         match self.vals.get(&key) {
           &StrOption(_) => match val {
             Some(s) => { self.vals.insert(key, StrOption(s)); },
@@ -97,7 +97,7 @@ impl OptionParser {
           }
         }
       } else {
-        println(format!("{:s} not a valid option", key))
+        warn!("{:s} not a valid option", key)
       }
     }
   }

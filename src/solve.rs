@@ -1,36 +1,130 @@
-use std::vec;
+use std::uint;
+use std::vec::Vec;
+use collections::dlist::DList;
 use pentomino::Pentomino;
-use dlink::{DancingMatrix, LinkedNode, EmptyNode,
-            InnerNode};
 
-pub fn generateSolutionMatrix(board: &Pentomino, 
-                              pentominoes: &~[Pentomino]) -> DancingMatrix {
-  let offset = pentominoes.len();
-  let cols = offset + board.area();
-  let mut removed: uint = 0;
-  let mut solutionMatrix = DancingMatrix::new(cols);
+
+/// Placements are represented in two ways.
+///
+/// First, as an array of integer values of
+/// the filled columns.
+/// Second, as an array of booleans representing
+/// which pieces on the board are filled 
+/// by the piece.
+#[deriving(Show)]
+struct Placement {
+  filled: Vec<uint>,
+  inner: Vec<bool>,
+  pieceNum: uint
+}
+
+
+impl Placement {
+  fn new(filled: Vec<uint>, inner: Vec<bool>, n: uint) -> Placement {
+    Placement { filled: filled, inner: inner, pieceNum: n }
+  }
+}
+
+
+impl Eq for Placement {
+  fn eq(&self, other: &Placement) -> bool {
+    self.filled == other.filled
+  }
+}
+
+
+/// Checks if a placement exists in a given array of Placements 
+fn permutationExists(p: &Placement, all: &Vec<Placement>) -> bool {
+  let mut present = false;
+
+  for o in all.iter() { if p == o { present = true; } }
+
+  present
+}
+
+
+type MatrixColumn = (bool, uint);
+
+
+trait Column {
+  fn len(&self) -> uint;
+  fn status(&self) -> bool;
+  fn incr(&mut self);
+  fn decr(&mut self);
+  fn toggle(&mut self, b: bool);
+}
+
+
+impl Column for MatrixColumn {
+  fn status(&self) -> bool {
+    self.val0()
+  }
+  fn len(&self) -> uint {
+    self.val1()
+  }
+  fn incr(&mut self) {
+    let len = self.mut1();
+    *len = *len + 1;
+  }
+  fn decr(&mut self) {
+    let len = self.mut1();
+    *len = *len - 1; 
+  }
+  fn toggle(&mut self, b: bool) {
+    let status = self.mut0();
+    *status = b; 
+  }
+}
+
+
+/// Finds all placements of all pieces (does not add equivalent 
+/// placements) in all positions on the board.
+pub fn generatePlacements(board: &Pentomino, 
+                          pentominoes: &Vec<Pentomino>,
+                          useRotations: bool,
+                          useReflections: bool) -> (Vec<MatrixColumn>, Vec<Placement>) {
+  let mut placements = Vec::new();
+  let mut columns = Vec::from_elem(board.area(), (true, 0 as uint));
 
   for (i, piece) in pentominoes.iter().enumerate() {
     let mut count: uint = 0;
+    let mut permutations = Vec::with_capacity(8);
 
+    // Add rotations
+    if useRotations {
+      for rotation in piece.rotations() { permutations.push(rotation); }
+    } else {
+      permutations.push(piece.clone());
+    }
+
+    // Add reflections
+    if useReflections {
+      let mut reflections = Vec::new();
+      for piece in permutations.iter() { reflections.push(piece.reflectX()); }
+      permutations.push_all_move(reflections);
+    }
+
+    // Generate all placements for each piece
     for (x, y, _) in board.coordinates() {
-      for rotation in piece.rotations() {
-        for permutation in rotation.reflections() {
-          if (board.canPlace(&permutation, x, y)) {
-            let num = i + 1;
-            let mut row = vec::from_elem(cols + 1, EmptyNode);
+      for permutation in permutations.iter() {
+        if board.canPlace(permutation, x, y) {
+          let mut filled = Vec::with_capacity(permutation.size());;
+          let mut inner = Vec::from_elem(board.area(), false);
 
-            row[0] = InnerNode(Default::default(), 0);
-            row[num] = InnerNode(LinkedNode::new(0, 0, num, num), num);
+          for (x0, y0, _) in permutation.filled() {
+            let j = board.getIndex(x + x0, y + y0);
+            *inner.get_mut(j) = true;
+            filled.push(j);
+          }
 
-            for (x0, y0, _) in permutation.filled() {
-              let j = offset + 1 + board.getIndex(x + x0, y + y0);
-              row[j] = InnerNode(LinkedNode::new(0, 0, j, j), j);
+          let newPlacement = Placement::new(filled, inner, i);
+
+          if !permutationExists(&newPlacement, &placements) {
+            for (i, b) in newPlacement.inner.iter().enumerate() {
+              if *b { columns.get_mut(i).incr() }
             }
-
-            if (solutionMatrix.insert(row)) {
-              count += 1;
-            }
+            placements.push(newPlacement);
+            count += 1;
           }
         }
       }
@@ -41,67 +135,55 @@ pub fn generateSolutionMatrix(board: &Pentomino,
     debug!("{:u} placements", count);
   }
 
-  for i in range(1, solutionMatrix.cols()) {
-    if (solutionMatrix.header()[i].len() == 0) {
-      solutionMatrix.deleteCol(i);
-      removed += 1;
-    }
-  }
-
-  debug!("Removed {:u} empty columns", removed);
-
-  solutionMatrix
+  (columns, placements) 
 }
 
 
-pub fn solve(solutionMatrix: &mut DancingMatrix, depth: uint, solutions: &mut uint) {
-  if (solutionMatrix.root().right() == 0) {
+pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
+             rows: &mut Vec<bool>, solutions: &mut uint, depth: uint, 
+             maxDepth: uint) {
+  if depth == maxDepth { 
+    println!("Solution Found");
     *solutions += 1;
     return;
   }
-
-  // Find the column with the minimum number of 1's 
-  let mut minCol = 0;
   
-  for (col, n) in solutionMatrix.iterHeader() {
-    if (minCol == 0) { minCol = col }
-    if (n.len() == 0) { return }
-    if (n.len() < solutionMatrix.get(0, minCol).len() && col != 0) { minCol = col }
+  let mut min = uint::MAX;
+
+  for (i, c) in columns.iter().enumerate() {
+    if c.status() {
+      if min == uint::MAX { min = i }
+      if c.len() == 0 { return }
+      if c.len() > columns.get(min).len() { min = i; }
+    }
   }
 
-  let mut currentCol;
-  let mut currentRow = solutionMatrix.get(0, minCol).down();
+  columns.get_mut(min).toggle(false);
 
-  //debug!("minCol=({:u}, {:u})", minCol, solutionMatrix.get(0, minCol).len());
+  // for row in column
+  // toggle the row in rows
+  // delete each column in the row
+  //  and each row in those columns
+  // recurse
+  // restore the rows and columns
+  for row in range(0, rows.len()) {
+    if *rows.get(row) && *placements.get(row).inner.get(min) {
+      let mut toggledRows: DList<uint> = DList::new();
+      let mut toggledCols: DList<uint> = DList::new();
 
-  solutionMatrix.coverCol(minCol);
+      for c in placements.get(row).filled.iter() {
+        columns.get_mut(*c).toggle(false);
 
-  while (currentRow != 0) {
-    currentCol = solutionMatrix.get(currentRow, minCol).right(); 
+        for row0 in range(0, rows.len()) {
+          if *rows.get(row0) && *placements.get(row0).inner.get(*c) {
+            *rows.get_mut(row0) = false;
+          }
+        }
+      }
 
-    // Cover all columns in the current row
-    while (currentCol != minCol) {
-      solutionMatrix.coverCol(currentCol);
-      
-      currentCol = solutionMatrix.get(currentRow, currentCol).right();
+      solve(placements, columns, rows, solutions, depth + 1, maxDepth);
     }
-
-    // Recursively solve
-    solve(solutionMatrix, depth + 1, solutions);
-
-    currentCol = solutionMatrix.get(currentRow, minCol).left();
-
-    // Uncover all columns in the current row (iterate in reverse)
-    while (currentCol != minCol) {
-      solutionMatrix.uncoverCol(currentCol);
-
-      currentCol = solutionMatrix.get(currentRow, currentCol).left();
-    }
-
-    currentRow = solutionMatrix.get(currentRow, minCol).down();
   }
 
-  solutionMatrix.uncoverCol(minCol);
+  columns.get_mut(min).toggle(true);
 }
-
-
