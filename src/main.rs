@@ -1,13 +1,18 @@
-#[allow(dead_code)];
-#[feature(phase)];
+#![allow(dead_code)]
+#![feature(phase)]
+
+
 #[phase(syntax, link)] extern crate log;
+extern crate rand;
 extern crate collections;
 
+
 use std::os;
-use std::vec;
+use std::vec::Vec;
 use parse::parseFile;
 use pentomino::Pentomino;
 use solve::{generatePlacements, solve};
+use solution::{convertSolutions, removeIsometric};
 use cmd::{OptionParser, BoolOption, StrOption,
           ToggleOption, UintOption}; 
 
@@ -15,13 +20,14 @@ use cmd::{OptionParser, BoolOption, StrOption,
 mod cmd;
 mod solve;
 mod parse;
+mod solution;
 mod pentomino;
 
 
 /// Finds the Board in a vector of pentominoes, and removes it
 /// and returns it.
 #[inline]
-pub fn discoverBoard(pentominoes: &mut Vec<Pentomino>) -> Pentomino {
+fn discoverBoard(pentominoes: &mut Vec<Pentomino>) -> Pentomino {
   let mut index = 0;
   let mut max = 0;
   
@@ -72,23 +78,38 @@ fn main() {
   // Help option supplied
   if parser.getBoolOption("help") { println!("{:s}", USAGE_TEXT); return }
 
+  // Parse the file
   let path = Path::new(args[1]);
   let mut pentominoes = parseFile(&path);
   let board = discoverBoard(&mut pentominoes);
 
   // Begin Solving
-  let mut solutions: uint = 0;
+  let offset = pentominoes.len();
+  let mut solutions = Vec::new();
+  let mut solutionsNum: uint = 0;
   let (mut cols, mut placements) = generatePlacements(&board, &pentominoes, 
                                                       parser.getBoolOption("rotations"), 
                                                       parser.getBoolOption("reflections"));
+  let rows = placements.len();
 
   println!("{:u}x{:u} Board", board.dimX, board.dimY);
+  println!("Pieces: {:u}", offset);
   println!("Columns: {:u}", cols.len());
-  println!("Rows: {:u}", placements.len()); 
-  println!("Target: {:u}", board.size());
+  println!("Rows: {:u}", rows); 
 
-  //solve(&mut placements, &mut vec::with_capacity(pentominoes.len()), 
-  //      board.size(), 0, &mut solutions);
+  solve(&mut placements, &mut cols, &mut Vec::from_elem(rows, true),  
+        &mut solutionsNum, 0, &mut Vec::with_capacity(offset),
+        &|solution| { solutions.push(solution.clone()); });
 
-  println!("Solutions Found: {:u}", solutions);
+  println!("Solutions Found: {:u}", solutionsNum);
+
+  let mut boards = convertSolutions(&board, &solutions, &placements, offset);
+
+  //for b in boards.iter() { println!("{:s}\n", b.to_str()) }
+
+  println!("Removing isometric solutions...");
+
+  removeIsometric(&mut boards);
+
+  println!("Non-Isometric Solutions: {:u}", boards.len());
 }

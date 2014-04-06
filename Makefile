@@ -6,7 +6,7 @@ OPT_LEVEL = 3
 FLAGS = --opt-level=$(OPT_LEVEL)
 
 FILES = main.rs parse.rs pentomino.rs \
-				solve.rs cmd.rs
+				solve.rs cmd.rs solution.rs
 SOURCES = $(addprefix $(SRC)/, $(FILES))
 
 all: $(BUILD)/main

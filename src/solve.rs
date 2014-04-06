@@ -1,7 +1,10 @@
 use std::uint;
+use std::bool;
 use std::vec::Vec;
-use collections::dlist::DList;
+use std::fmt::{Show, Formatter, Result};
 use pentomino::Pentomino;
+use collections::dlist::DList;
+use collections::deque::Deque;
 
 
 /// Placements are represented in two ways.
@@ -11,24 +14,37 @@ use pentomino::Pentomino;
 /// Second, as an array of booleans representing
 /// which pieces on the board are filled 
 /// by the piece.
-#[deriving(Show)]
-struct Placement {
+pub struct Placement {
   filled: Vec<uint>,
-  inner: Vec<bool>,
-  pieceNum: uint
+  inner: Vec<bool>
 }
 
 
 impl Placement {
-  fn new(filled: Vec<uint>, inner: Vec<bool>, n: uint) -> Placement {
-    Placement { filled: filled, inner: inner, pieceNum: n }
+  fn new(filled: Vec<uint>, inner: Vec<bool>) -> Placement {
+    Placement { filled: filled, inner: inner }
   }
+  pub fn filled<'a>(&'a self) -> &'a Vec<uint> { &self.filled }
+  pub fn inner<'a>(&'a self) -> &'a Vec<bool> { &self.inner }
 }
 
 
 impl Eq for Placement {
   fn eq(&self, other: &Placement) -> bool {
     self.filled == other.filled
+  }
+}
+
+
+impl Show for Placement {
+  fn fmt(&self, f: &mut Formatter) -> Result {
+    let mut buf = ~"";
+
+    for b in self.inner.iter() {
+      buf.push_str(bool::to_bit::<uint>(*b).to_str() + ", ");
+    }
+
+    write!(f.buf, "{:s}", buf) 
   }
 }
 
@@ -83,8 +99,10 @@ pub fn generatePlacements(board: &Pentomino,
                           pentominoes: &Vec<Pentomino>,
                           useRotations: bool,
                           useReflections: bool) -> (Vec<MatrixColumn>, Vec<Placement>) {
+  let offset = pentominoes.len();
+  let cols = board.area() + offset; 
   let mut placements = Vec::new();
-  let mut columns = Vec::from_elem(board.area(), (true, 0 as uint));
+  let mut columns = Vec::from_elem(cols, (true, 0 as uint));
 
   for (i, piece) in pentominoes.iter().enumerate() {
     let mut count: uint = 0;
@@ -108,20 +126,23 @@ pub fn generatePlacements(board: &Pentomino,
     for (x, y, _) in board.coordinates() {
       for permutation in permutations.iter() {
         if board.canPlace(permutation, x, y) {
-          let mut filled = Vec::with_capacity(permutation.size());;
-          let mut inner = Vec::from_elem(board.area(), false);
+          let mut filled = Vec::with_capacity(permutation.size() + 1);;
+          let mut inner = Vec::from_elem(cols, false);
+          
+          *inner.get_mut(i) = true;
+          filled.push(i);
 
           for (x0, y0, _) in permutation.filled() {
-            let j = board.getIndex(x + x0, y + y0);
+            let j = board.getIndex(x + x0, y + y0) + offset;
             *inner.get_mut(j) = true;
             filled.push(j);
           }
 
-          let newPlacement = Placement::new(filled, inner, i);
+          let newPlacement = Placement::new(filled, inner);
 
           if !permutationExists(&newPlacement, &placements) {
-            for (i, b) in newPlacement.inner.iter().enumerate() {
-              if *b { columns.get_mut(i).incr() }
+            for i in newPlacement.filled.iter() {
+              columns.get_mut(*i).incr();
             }
             placements.push(newPlacement);
             count += 1;
@@ -135,55 +156,79 @@ pub fn generatePlacements(board: &Pentomino,
     debug!("{:u} placements", count);
   }
 
+  for c in columns.mut_iter() {
+    if c.len() == 0 { c.toggle(false); }
+  }
+
   (columns, placements) 
 }
 
 
 pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
              rows: &mut Vec<bool>, solutions: &mut uint, depth: uint, 
-             maxDepth: uint) {
-  if depth == maxDepth { 
-    println!("Solution Found");
-    *solutions += 1;
-    return;
-  }
-  
+             current: &mut Vec<uint>, success: &|&Vec<uint>| -> ()) {
   let mut min = uint::MAX;
 
   for (i, c) in columns.iter().enumerate() {
     if c.status() {
       if min == uint::MAX { min = i }
       if c.len() == 0 { return }
-      if c.len() > columns.get(min).len() { min = i; }
+      if c.len() < columns.get(min).len() { min = i; }
     }
+  }
+
+  if min == uint::MAX {
+    *solutions += 1;
+    (*success)(current);
+    return;
   }
 
   columns.get_mut(min).toggle(false);
 
-  // for row in column
-  // toggle the row in rows
-  // delete each column in the row
-  //  and each row in those columns
-  // recurse
-  // restore the rows and columns
   for row in range(0, rows.len()) {
-    if *rows.get(row) && *placements.get(row).inner.get(min) {
+    if *rows.get(row) && *placements.get(row).inner().get(min) {
       let mut toggledRows: DList<uint> = DList::new();
       let mut toggledCols: DList<uint> = DList::new();
 
-      for c in placements.get(row).filled.iter() {
+      for c in placements.get(row).filled().iter() {
         columns.get_mut(*c).toggle(false);
 
+        toggledCols.push_back(*c);
+
         for row0 in range(0, rows.len()) {
-          if *rows.get(row0) && *placements.get(row0).inner.get(*c) {
+          if *rows.get(row0) && *placements.get(row0).inner().get(*c) {
             *rows.get_mut(row0) = false;
+            for col0 in placements.get(row0).filled().iter() { columns.get_mut(*col0).decr(); }
+            toggledRows.push_back(row0);
           }
         }
       }
 
-      solve(placements, columns, rows, solutions, depth + 1, maxDepth);
+      current.push(row);
+
+      solve(placements, columns, rows, solutions, depth + 1, current, success);
+
+      current.pop();
+
+      for row0 in toggledRows.iter() { 
+        *rows.get_mut(*row0) = true; 
+        for col0 in placements.get(*row0).filled().iter() { columns.get_mut(*col0).incr(); }
+      }
+      for col in toggledCols.iter() { columns.get_mut(*col).toggle(true); }
     }
   }
 
   columns.get_mut(min).toggle(true);
+}
+
+fn printMatrix(placements: &Vec<Placement>, columns: &Vec<MatrixColumn>,
+               filled: &Vec<bool>) {
+  for (i, p) in placements.iter().enumerate() {
+    if *filled.get(i) {
+      for (j, b) in p.inner.iter().enumerate() { 
+        if columns.get(j).status() { print!("{:u}, ", bool::to_bit::<uint>(*b)) }
+      }
+      println!("")
+    }
+  }
 }
