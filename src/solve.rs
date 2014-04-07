@@ -164,12 +164,40 @@ pub fn generatePlacements(board: &Pentomino,
 }
 
 
+/// Important parameters:
+///   * placements - a vector of ways to place each Pentomino on the board. 
+///   * columns - a vector of columns which hold the length of the number of 
+///               'active' filled spaces below it
+///   * rows - a boolean vector that keeps track of rows that still can be chosen.
+///            at each recursive call, rows that overlap with the chosen row 
+///            will be pruned.
+/// 
+/// Algorithm
+/// 
+/// Placements hold a vector of integers representing filled coordinates on the board 
+/// (as well as which index the piece corresponds), and the actual vector of boolean 
+/// values that represent the placement of the piece on the board (an 8x8 board with 
+/// 12 pieces would have 64 + 12 columns).
+///
+/// On each call, the column with the minimum length is selected. This column is chosen 
+/// to reduce the branching factor of the recursive calls.
+///
+/// That column is removed, and a row with a one in that column is selected and removed.
+/// This action represents selecting one way to cover a certain square on the board, 
+/// or chosing a certain piece. Any row that has a one that overlaps with a one 
+/// in the chosen row can be removed because the two rows would represent an overlap 
+/// of two pieces on the board. 
+///
+/// Afterwards, the index of the chosen row is added to a vector, which keeps track of 
+/// the current solution. `solve` is then called recursively. This is done for each 
+/// row with a one in it from the chosen column.
 pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
              rows: &mut Vec<bool>, solutions: &mut uint, depth: uint, 
              current: &mut Vec<uint>, maxSolutions: uint, 
              success: &|&Vec<uint>| -> ()) {
   if *solutions == maxSolutions && maxSolutions != 0 { return }
 
+  // Find the minimum column
   let mut min = uint::MAX;
 
   for (i, c) in columns.iter().enumerate() {
@@ -186,13 +214,18 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
     return;
   }
 
+  // Remove the chosen column from the columns vector
   columns.get_mut(min).toggle(false);
 
   for row in range(0, rows.len()) {
+    // Choose a row that hasn't already been chosen
     if *rows.get(row) && *placements.get(row).inner().get(min) {
+      // Store the columns and rows that were toggled, so it 
+      // can be undone afterwards
       let mut toggledRows: DList<uint> = DList::new();
       let mut toggledCols: DList<uint> = DList::new();
 
+      // Remove the overlapping rows
       for c in placements.get(row).filled().iter() {
         columns.get_mut(*c).toggle(false);
 
@@ -209,6 +242,7 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
         }
       }
 
+      // Recurse
       current.push(row);
 
       solve(placements, columns, rows, solutions, depth + 1, 
@@ -216,6 +250,7 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
 
       current.pop();
 
+      // Restore the toggled rows and columns
       for row0 in toggledRows.iter() { 
         *rows.get_mut(*row0) = true; 
         for col0 in placements.get(*row0).filled().iter() { 
@@ -226,9 +261,12 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
     }
   }
 
+  // Restore the minimum column to the columns vector
   columns.get_mut(min).toggle(true);
 }
 
+
+/// For debug
 fn printMatrix(placements: &Vec<Placement>, columns: &Vec<MatrixColumn>,
                filled: &Vec<bool>) {
   for (i, p) in placements.iter().enumerate() {
