@@ -9,6 +9,7 @@ extern crate collections;
 
 use std::os;
 use std::vec::Vec;
+use std::io::{File, Truncate, Write};
 use parse::parseFile;
 use pentomino::Pentomino;
 use solve::{generatePlacements, solve};
@@ -49,9 +50,10 @@ fn discoverBoard(pentominoes: &mut Vec<Pentomino>) -> Pentomino {
 static USAGE_TEXT: &'static str = "
   usage: ./pentominoes <filename> [--reflections=true|false]         
          [--rotations=true|false] [--help] [--solutions=0|..|n]       
-         [--output=filename.txt]
+         [--output=filename.txt] [--all-solutions]
                                                               
   options:                                                    
+    all-solutions   toggle showing all solutions (including isometric ones)
     reflections     include reflections in the solution space 
     rotations       include rotations in the solution space   
     output          write the solutions to an output file, otherwise print to stdout
@@ -64,11 +66,12 @@ fn main() {
   let args = os::args();
   let mut parser = OptionParser::new();
 
-  parser.addOption(~"rotations", BoolOption(true));
-  parser.addOption(~"reflections", BoolOption(true));
-  parser.addOption(~"output", StrOption(~""));
-  parser.addOption(~"help", ToggleOption(false));
-  parser.addOption(~"solutions", UintOption(0));
+  parser.addOption("rotations", BoolOption(true));
+  parser.addOption("reflections", BoolOption(true));
+  parser.addOption("output", StrOption(~""));
+  parser.addOption("help", ToggleOption(false));
+  parser.addOption("solutions", UintOption(0));
+  parser.addOption("all-solutions", ToggleOption(false));
 
   // Not enough arguments supplied
   if !(args.len() > 1) { println!("{:s}", USAGE_TEXT); return }
@@ -99,17 +102,35 @@ fn main() {
 
   solve(&mut placements, &mut cols, &mut Vec::from_elem(rows, true),  
         &mut solutionsNum, 0, &mut Vec::with_capacity(offset),
+        parser.getUintOption("solutions"),
         &|solution| { solutions.push(solution.clone()); });
 
   println!("Solutions Found: {:u}", solutionsNum);
 
+  // Convert solution vectors to Pentominos
   let mut boards = convertSolutions(&board, &solutions, &placements, offset);
 
-  //for b in boards.iter() { println!("{:s}\n", b.to_str()) }
+  // Remove all isometric solutions
+  if !parser.getBoolOption("all-solutions") {
+    println!("Removing isometric solutions...");
+    removeIsometric(&mut boards);
+    println!("Non-Isometric Solutions: {:u}", boards.len());
+  }
 
-  println!("Removing isometric solutions...");
+  // Write the output to a File
+  // or print to stdout
+  if parser.getStrOption("output") != &~"" {
+    let outputPath = Path::new(parser.getStrOption("output").to_owned());
+    let mut outputFile = match File::open_mode(&outputPath, Truncate, Write) {
+      Ok(f) => f,
+      Err(e) => { fail!("output file error: {}", e) }
+    };
 
-  removeIsometric(&mut boards);
-
-  println!("Non-Isometric Solutions: {:u}", boards.len());
+    for (i, b) in boards.iter().enumerate() {
+      outputFile.write_str(format!("-- Solution {:u} --\n", i));
+      outputFile.write_str(format!("{:s}\n\n", b.to_str()));
+    }
+  } else {
+    for b in boards.iter() { println!("{:s}\n", b.to_str()); }
+  }
 }

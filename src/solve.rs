@@ -166,7 +166,10 @@ pub fn generatePlacements(board: &Pentomino,
 
 pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
              rows: &mut Vec<bool>, solutions: &mut uint, depth: uint, 
-             current: &mut Vec<uint>, success: &|&Vec<uint>| -> ()) {
+             current: &mut Vec<uint>, maxSolutions: uint, 
+             success: &|&Vec<uint>| -> ()) {
+  if *solutions == maxSolutions && maxSolutions != 0 { return }
+
   let mut min = uint::MAX;
 
   for (i, c) in columns.iter().enumerate() {
@@ -198,7 +201,9 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
         for row0 in range(0, rows.len()) {
           if *rows.get(row0) && *placements.get(row0).inner().get(*c) {
             *rows.get_mut(row0) = false;
-            for col0 in placements.get(row0).filled().iter() { columns.get_mut(*col0).decr(); }
+            for col0 in placements.get(row0).filled().iter() { 
+              columns.get_mut(*col0).decr(); 
+            }
             toggledRows.push_back(row0);
           }
         }
@@ -206,13 +211,16 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
 
       current.push(row);
 
-      solve(placements, columns, rows, solutions, depth + 1, current, success);
+      solve(placements, columns, rows, solutions, depth + 1, 
+            current, maxSolutions, success);
 
       current.pop();
 
       for row0 in toggledRows.iter() { 
         *rows.get_mut(*row0) = true; 
-        for col0 in placements.get(*row0).filled().iter() { columns.get_mut(*col0).incr(); }
+        for col0 in placements.get(*row0).filled().iter() { 
+          columns.get_mut(*col0).incr(); 
+        }
       }
       for col in toggledCols.iter() { columns.get_mut(*col).toggle(true); }
     }

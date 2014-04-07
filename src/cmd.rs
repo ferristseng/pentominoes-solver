@@ -46,6 +46,10 @@ fn parseOption(opt: &~str) -> (~str, Option<~str>){
 }
 
 
+// A static string to initialize pointers to...
+static DEAD: &'static str = ""; 
+
+
 /// Basic options parser (Only parses very simple options)
 ///
 /// Attributes
@@ -55,8 +59,8 @@ fn parseOption(opt: &~str) -> (~str, Option<~str>){
 ///            value that the option holds
 ///
 pub struct OptionParser {
-  defs: HashMap<~str, OptionType>,
-  vals: HashMap<~str, OptionType>
+  defs: HashMap<&'static str, OptionType>,
+  vals: HashMap<&'static str, OptionType>
 }
 
 
@@ -71,28 +75,46 @@ impl OptionParser {
     for arg in args.iter() {
       let (key, val) = parseOption(arg);
 
-      if self.vals.contains_key(&key) {
-        match self.vals.get(&key) {
-          &StrOption(_) => match val {
-            Some(s) => { self.vals.insert(key, StrOption(s)); },
+      if self.vals.contains_key_equiv::<~str>(&key) {
+        // Find the equivalent key in the HashMap...
+        //
+        // Unfortunately, there is no other way of 
+        // getting a mutable value with an equivalent 
+        // key
+        let equivKey = {
+          let mut equivKey = &DEAD;
+
+          for k in self.defs.keys() {
+            if k.equiv(&key) { equivKey = k; break; }
+          }
+
+          assert!(*equivKey != DEAD)
+
+          equivKey
+        };
+
+        // Set the old value to the new one
+        match self.vals.get_mut(equivKey) {
+          &StrOption(ref mut s) => match val {
+            Some(s0) => *s = s0, 
             _ => fail!("expected an option value")
           },
-          &BoolOption(_) => match val {
+          &BoolOption(ref mut b) => match val {
             Some(s) => match from_str(s) {
-              Some(b) => { self.vals.insert(key, BoolOption(b)); },
+              Some(b0) => *b = b0, 
               _ => fail!("expected a valid boolean value")
             },
             _ => fail!("expected an option value")
           },
-          &UintOption(_) => match val {
+          &UintOption(ref mut i) => match val {
             Some(s) => match from_str(s) {
-              Some(i) => { self.vals.insert(key, UintOption(i)); },
+              Some(i0) => *i = i0, 
               _ => fail!("expected a valid uint value")
             },
             _ => fail!("expected an option value")
           },
-          &ToggleOption(b) => match val {
-            None => { self.vals.insert(key, ToggleOption(!b)); },
+          &ToggleOption(ref mut b) => match val {
+            None => *b = !*b, 
             _ => fail!("did not expect a value")
           }
         }
@@ -101,7 +123,7 @@ impl OptionParser {
       }
     }
   }
-  pub fn addOption(&mut self, k: ~str, t: OptionType) {
+  pub fn addOption(&mut self, k: &'static str, t: OptionType) {
     self.defs.insert(k, t);
   }
 }
@@ -109,21 +131,21 @@ impl OptionParser {
 
 // Getters
 impl OptionParser {
-  pub fn getBoolOption(&self, k: &str) -> bool {
-    match self.vals.get(&k.to_owned()) {
+  pub fn getBoolOption(&self, k: &'static str) -> bool {
+    match self.vals.get(&k) {
       &BoolOption(b) | 
       &ToggleOption(b) => b,
       _ => fail!("`{:?}` not a boolean option", k)
     }
   }
-  pub fn getUintOption(&self, k: &str) -> uint {
-    match self.vals.get(&k.to_owned()) {
+  pub fn getUintOption(&self, k: &'static str) -> uint {
+    match self.vals.get(&k) {
       &UintOption(i) => i,
       _ => fail!("`{:?}` not a uint option", k)
     }
   }
-  pub fn getStrOption<'a>(&'a self, k: &str) -> &'a ~str {
-    match self.vals.get(&k.to_owned()) {
+  pub fn getStrOption<'a>(&'a self, k: &'static str) -> &'a ~str {
+    match self.vals.get(&k) {
       &StrOption(ref s) => s,
       _ => fail!("`{:?}` not a boolean option", k)
     }
