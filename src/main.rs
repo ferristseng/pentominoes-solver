@@ -127,7 +127,7 @@ fn main() {
     };
 
     for (i, b) in boards.iter().enumerate() {
-      outputFile.write_str(format!("-- Solution {:u} --\n", i));
+      outputFile.write_str(format!("-- Solution {:u} --\n", i + 1));
       outputFile.write_str(format!("{:s}\n\n", b.to_str()));
     }
   } else {
