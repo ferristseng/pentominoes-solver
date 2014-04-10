@@ -156,9 +156,7 @@ pub fn generatePlacements(board: &Pentomino,
     debug!("{:u} placements", count);
   }
 
-  for c in columns.mut_iter() {
-    if c.len() == 0 { c.toggle(false); }
-  }
+  for c in columns.mut_iter() { if c.len() == 0 { c.toggle(false); } }
 
   (columns, placements) 
 }
@@ -192,19 +190,19 @@ pub fn generatePlacements(board: &Pentomino,
 /// the current solution. `solve` is then called recursively. This is done for each 
 /// row with a one in it from the chosen column.
 pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
-             rows: &mut Vec<bool>, solutions: &mut uint, depth: uint, 
-             current: &mut Vec<uint>, maxSolutions: uint, 
+             rows: &mut Vec<bool>, solutions: &mut uint, depth: uint,
+             current: &mut Vec<uint>, maxSolutions: uint, pieceNum: uint, 
              success: &|&Vec<uint>| -> ()) {
   if *solutions == maxSolutions && maxSolutions != 0 { return }
 
   // Find the minimum column
   let mut min = uint::MAX;
 
-  for (i, c) in columns.iter().enumerate() {
+  for (i, c) in columns.slice_from(pieceNum).iter().enumerate() {
     if c.status() {
-      if min == uint::MAX { min = i }
+      if min == uint::MAX { min = i + pieceNum }
       if c.len() == 0 { return }
-      if c.len() < columns.get(min).len() { min = i; }
+      if c.len() < columns.get(min).len() { min = i + pieceNum; }
     }
   }
 
@@ -246,7 +244,7 @@ pub fn solve(placements: &mut Vec<Placement>, columns: &mut Vec<MatrixColumn>,
       current.push(row);
 
       solve(placements, columns, rows, solutions, depth + 1, 
-            current, maxSolutions, success);
+            current, maxSolutions, pieceNum, success); 
 
       current.pop();
 

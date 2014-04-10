@@ -86,6 +86,16 @@ fn main() {
   let mut pentominoes = parseFile(&path);
   let board = discoverBoard(&mut pentominoes);
 
+  // Validate
+  let totalPieceSize = pentominoes.iter().fold(0, |a, b| a + b.size());
+
+  if totalPieceSize < board.size() {
+    fail!("board has {:u} squares, only {:u} squares in pieces!", board.size(), totalPieceSize);
+  } else if totalPieceSize > board.size() {
+    println!("board has {:u} squares, {:u} squares in pieces! solution will not use all pieces!", 
+             board.size(), totalPieceSize);
+  }
+
   // Begin Solving
   let offset = pentominoes.len();
   let mut solutions = Vec::new();
@@ -102,7 +112,7 @@ fn main() {
 
   solve(&mut placements, &mut cols, &mut Vec::from_elem(rows, true),  
         &mut solutionsNum, 0, &mut Vec::with_capacity(offset),
-        parser.getUintOption("solutions"),
+        parser.getUintOption("solutions"), offset,
         &|solution| { solutions.push(solution.clone()); });
 
   println!("Solutions Found: {:u}", solutionsNum);
