@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% block content %}
+{% if err %}
+  <div class="error">{{ err }}</div>
+{% else %}
+  <h3>Solutions ({{ solutions|length }})</h3>
+  {% for solution in solutions %}
+    <div class="solution">
+      {% for line in solution %}
+        <div class="row">
+        {% for c in line %}
+          <div class="block {{ c }}"></div>
+        {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}

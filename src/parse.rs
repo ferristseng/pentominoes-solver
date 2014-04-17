@@ -32,7 +32,7 @@ fn discoverPoints(startX: uint, startY: uint, system: &mut System,
 /// a file at the path, finding all 
 /// valid Pentominoes in the file.
 pub fn parseFile(path: &Path) -> Vec<Pentomino> {
-  assert!(path.exists())
+  if !path.exists() { fail!("file not found!") }
 
   let mut file = File::open(path);
 
@@ -61,6 +61,10 @@ pub fn parseFile(path: &Path) -> Vec<Pentomino> {
       // EOF
       Err(_) => break 
     }
+  }
+
+  if points.len() == 0 {
+    fail!("invalid (possibly empty) text file!")
   }
 
   loop {

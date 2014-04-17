@@ -4,8 +4,18 @@ A generic polyomino solver (mostly tested with pentominoes puzzles).
 
 # Installation
 
+First make the executable.
+
 ```
 make
+```
+
+There is a web based GUI written in python using Flask.
+
+To launch:
+
+```
+python gui.py
 ```
 
 ### Puzzle Format
@@ -39,7 +49,7 @@ considered as the board.
 
 ```
 
-### Usage
+### CLI Usage
 
 ```
 

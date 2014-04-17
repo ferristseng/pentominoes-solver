@@ -1,0 +1,64 @@
+body {
+  font-family: 'Helvetica', 'sans-serif';
+}
+
+div {
+  margin: 5px 10px;
+}
+
+form label {
+  display: inline-block;
+  width: 240px;
+}
+
+form input[type="text"], 
+form input[type="number"] {
+  width: 520px;
+}
+
+.row {
+  margin: 0px;
+}
+
+.block {
+  width: 16px;
+  height: 16px;
+  margin: 1px;
+  display: inline-block;
+}
+
+.solution {
+  margin: 10px 0px;
+}
+
+.error {
+  padding: 5px;
+  border: 1px solid #DF0101;
+}
+
+.A { background-color: #F78181 }
+.B { background-color: #F79F81 }
+.C { background-color: #0101DF }
+.D { background-color: #04B4AE }
+.E { background-color: #0B6121 }
+.F { background-color: #B404AE }
+.G { background-color: #FFFF00 }
+.H { background-color: #819FF7 }
+.I { background-color: #A9F5F2 }
+.J { background-color: #B4045F }
+.K { background-color: #FF8000 }
+.L { background-color: #2EFE2E }
+.M { background-color: #0B4C5F }
+.N { background-color: #3B0B17 }
+.O { background-color: #0B3B24 }
+.P { background-color: #86B404 }
+.Q { background-color: #610B21 }
+.R { background-color: #61380B }
+.S { background-color: #04B431 }
+.T { background-color: #B18904 }
+.U { background-color: #F5A9D0 }
+.V { background-color: #9FF781 }
+.W { background-color: #3B0B17 }
+.X { background-color: #071418 }
+.Y { background-color: #220A29 }
+.Z { background-color: #292A0A }

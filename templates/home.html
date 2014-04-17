@@ -1,0 +1,27 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h3>Pentomino Solver</h3>
+<div>
+  <form action="/solve" method="post">
+    <div>
+      <label>Filename:</label>
+      <input type="text" name="filename">
+    </div>
+    <div>
+      <label>Reflections:</label>
+      <input type="checkbox" name="reflections" value="true" checked="true" />
+    </div>
+    <div>
+      <label>Rotations:</label>
+      <input type="checkbox" name="rotations" value="true" checked="true" />
+    </div>
+    <div>
+      <label>Max Solutions (0 means find all):</label>
+      <input type="number" name="solutions" value="0" />
+    </div>
+    <div>
+      <input type="submit" value="Search" />
+     </div>
+  </form>
+</div>
+{% endblock %}

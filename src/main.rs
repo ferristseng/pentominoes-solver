@@ -89,10 +89,11 @@ fn main() {
   // Validate
   let totalPieceSize = pentominoes.iter().fold(0, |a, b| a + b.size());
 
+  if pentominoes.len() > 27 { fail!("too many pieces, can't map pieces to alphabet!") }
   if totalPieceSize < board.size() {
     fail!("board has {:u} squares, only {:u} squares in pieces!", board.size(), totalPieceSize);
   } else if totalPieceSize > board.size() {
-    println!("board has {:u} squares, {:u} squares in pieces! solution will not use all pieces!", 
+    debug!("board has {:u} squares, {:u} squares in pieces! solution will not use all pieces!", 
              board.size(), totalPieceSize);
   }
 
@@ -105,26 +106,26 @@ fn main() {
                                                       parser.getBoolOption("reflections"));
   let rows = placements.len();
 
-  println!("{:u}x{:u} Board", board.dimX, board.dimY);
-  println!("Pieces: {:u}", offset);
-  println!("Columns: {:u}", cols.len());
-  println!("Rows: {:u}", rows); 
+  debug!("{:u}x{:u} Board", board.dimX, board.dimY);
+  debug!("Pieces: {:u}", offset);
+  debug!("Columns: {:u}", cols.len());
+  debug!("Rows: {:u}", rows); 
 
   solve(&mut placements, &mut cols, &mut Vec::from_elem(rows, true),  
         &mut solutionsNum, 0, &mut Vec::with_capacity(offset),
         parser.getUintOption("solutions"), offset,
         &|solution| { solutions.push(solution.clone()); });
 
-  println!("Solutions Found: {:u}", solutionsNum);
+  debug!("Solutions Found: {:u}", solutionsNum);
 
   // Convert solution vectors to Pentominos
   let mut boards = convertSolutions(&board, &solutions, &placements, offset);
 
   // Remove all isometric solutions
   if !parser.getBoolOption("all-solutions") {
-    println!("Removing isometric solutions...");
+    debug!("Removing isometric solutions...");
     removeIsometric(&mut boards);
-    println!("Non-Isometric Solutions: {:u}", boards.len());
+    debug!("Non-Isometric Solutions: {:u}", boards.len());
   }
 
   // Write the output to a File
