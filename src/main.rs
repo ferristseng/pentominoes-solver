@@ -84,12 +84,14 @@ fn main() {
   // Parse the file
   let path = Path::new(args[1]);
   let mut pentominoes = parseFile(&path);
+
+  if pentominoes.len() > 26 { fail!("too many pieces, can't map pieces to alphabet!") }
+
   let board = discoverBoard(&mut pentominoes);
 
   // Validate
   let totalPieceSize = pentominoes.iter().fold(0, |a, b| a + b.size());
 
-  if pentominoes.len() > 27 { fail!("too many pieces, can't map pieces to alphabet!") }
   if totalPieceSize < board.size() {
     fail!("board has {:u} squares, only {:u} squares in pieces!", board.size(), totalPieceSize);
   } else if totalPieceSize > board.size() {
